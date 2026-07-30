@@ -1,0 +1,20 @@
+[project]
+name = "gh-class"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "careful>=0.4.0",
+    "dacite>=1.9.2",
+    "typer>=0.27.0",
+]
+
+[project.scripts]
+gh-class = "gh_class.__main__:app"
+
+[tool.uv]
+package = true
+
+# [tool.uv.sources]
+# careful = { path = "../careful" }
