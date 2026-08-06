@@ -1,12 +1,22 @@
+# gcr
 
+Command-line utility for running a class on GitHub, a lightweight GitHub classroom replacement.
+
+At the moment, this is early alpha software, use at your own risk.
+
+*Feedback welcome!*
+
+## Installation
+
+The recommended method for installation is `uvx gcr`.
 
 ## Setup
 
 1. Set env variable GITHUB_TOKEN to a classic token with org & repo admin permissions.
-2. Create a class.toml with roster & settings.
+1. Manually create a GitHub organization for your classroom.
+1. Create a `class.toml` with your roster & settings. `gcr` will look for `class.toml` in the current directory, or you can pass the `-c/--config` option to specify the path.
 
-### class.toml
-
+```toml
 org = "name-of-github-org"
 
 students = [
@@ -30,12 +40,18 @@ staff_permission = "maintain"
 requests_per_minute = 60
 retry_attempts = 3
 retry_wait_seconds = 5
+```
 
 ## Usage
 
+All commands take two options:
+
+- `-c`/`--config`: path to `class.toml` (default: current dir)
+- `--dry-run`: avoid making actual changes on GitHub
+
 ### Initialize
 
-`gh-class setup`
+`gcr setup`
 
 Initialize GitHub organization and invite staff & students.
 
@@ -43,6 +59,6 @@ Initialize GitHub organization and invite staff & students.
 
 ### Create Assignment
 
-`gh-class assign <template-repo-name>`
+`gcr assign <template-repo-name>`
 
 Creates one private repo per student, granting access to their account & staff.

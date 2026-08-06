@@ -1,18 +1,33 @@
 [project]
-name = "gh-class"
-version = "0.1.0"
-description = "Add your description here"
+name = "gcr-cli"
+version = "0.2.0"
+license = "AGPL-3.0-or-later"
+description = "Command-line utility for running a class on GitHub."
+authors = [
+    {name="jpt", email="dev@jpt.sh"},
+]
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "careful>=0.5.0",
     "dacite>=1.9.2",
     "typer>=0.27.0",
 ]
 
+[project.urls]
+Repository = "https://github.com/jamesturk/gcr"
+
 [project.scripts]
-gh-class = "gh_class.__main__:app"
+gcr = "gcr.__main__:app"
 
 [tool.uv]
 package = true
 
+[tool.ruff]
+lint.select = [
+  "ANN", # annotations
+  "E", # pycodestyle errors - handles basic Python style
+  "W", # pycodestyle warnings - handles whitespace issues
+  "F", # pyflakes - handles unused imports and variables
+  "N", # pep8-naming - handles naming conventions
+]

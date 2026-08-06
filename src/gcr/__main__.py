@@ -7,7 +7,7 @@ import typer
 from pathlib import Path
 from typing import Annotated
 from .client import GitHub, GitHubError
-from .settings import load_config
+from .settings import load_config, Config
 
 app = typer.Typer(add_completion=False, help="GitHub Classroom replacement CLI")
 
@@ -25,7 +25,7 @@ def _quit(msg: str) -> None:
     raise typer.Exit(1)
 
 
-def _check_env(config_path: Path):
+def _check_env(config_path: Path) -> tuple[Config, GitHub]:
     """check that token & config are present & return them"""
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
@@ -44,7 +44,9 @@ def _check_env(config_path: Path):
     return cfg, gh
 
 
-def _sync_team(gh, org, team, cfg_members, dry_run):
+def _sync_team(
+    gh: GitHub, org: str, team: str, cfg_members: list[str], dry_run: bool
+) -> None:
     members = set()
     invites = set()
     current_set = set(cfg_members)
@@ -92,7 +94,8 @@ def _sync_team(gh, org, team, cfg_members, dry_run):
     for m in invites:
         if m in to_uninvite:
             typer.secho(
-                f"{m} has been removed but has an invite to {team} (remove or let expire)",
+                f"{m} has been removed but has an invite to {team} "
+                "(remove or let expire)",
                 fg=Theme.ERROR,
             )
         else:
@@ -108,11 +111,15 @@ def setup(
         bool,
         typer.Option("--dry-run", help="Show plan, make no changes."),
     ] = False,
-):
+) -> None:
     """initialize classroom org"""
     cfg, gh = _check_env(config)
     if not dry_run:
-        typer.secho("locking down default org settings\n  (hidden repos by default/no student creation)", fg=Theme.OK)
+        typer.secho(
+            "locking down default org settings\n"
+            "  (hidden repos by default/no student creation)",
+            fg=Theme.OK,
+        )
         gh.patch_org(
             cfg.org,
             {
@@ -150,7 +157,8 @@ def assign(
         _quit(f"template not found: {t_owner}/{t_repo}")
     if not tmpl.json().get("is_template", False):
         _quit(
-            f"not a template repo (enable 'Template repository' in settings): {t_owner}/{t_repo}"
+            f"not a template repo (enable 'Template repository' in settings):"
+            f" {t_owner}/{t_repo}"
         )
 
     # all usernames exist
