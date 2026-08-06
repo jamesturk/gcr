@@ -1,5 +1,5 @@
-import httpx
-from careful.httpx import make_careful_client, PluginClient
+import httpx2
+from careful.httpx import make_careful_client
 from .settings import Settings
 
 API = "https://api.github.com"
@@ -10,7 +10,7 @@ class GitHubError(Exception):
     pass
 
 
-def _check(resp: httpx.Response, ok: tuple[int, ...], what: str) -> None:
+def _check(resp: httpx2.Response, ok: tuple[int, ...], what: str) -> None:
     if resp.status_code not in ok:
         try:
             detail = resp.json().get("message", "")
@@ -19,14 +19,14 @@ def _check(resp: httpx.Response, ok: tuple[int, ...], what: str) -> None:
         raise GitHubError(f"HTTP {resp.status_code} {detail}".strip() + f" ({what})")
 
 
-def _should_retry(resp: httpx.Response) -> bool:
+def _should_retry(resp: httpx2.Response) -> bool:
     # retry intermittent failures
     return resp.status_code >= 500 or resp.status_code == 429
 
 
 class GitHub:
     def __init__(self, token: str, settings: Settings) -> None:
-        base = PluginClient(
+        base = httpx2.Client(
             base_url=API,
             headers={
                 "Authorization": f"Bearer {token}",
@@ -49,7 +49,7 @@ class GitHub:
     def org_exists(self, org: str) -> bool:
         return self.c.get(f"/orgs/{org}").status_code == 200
 
-    def get_repo(self, org: str, repo: str) -> httpx.Response:
+    def get_repo(self, org: str, repo: str) -> httpx2.Response:
         return self.c.get(f"/repos/{org}/{repo}")
 
     def repo_exists(self, org: str, repo: str) -> bool:
