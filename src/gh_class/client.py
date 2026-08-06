@@ -1,6 +1,6 @@
 import httpx2
 from careful.httpx import make_careful_client
-from .settings import Settings
+from .settings import Config
 
 API = "https://api.github.com"
 API_VERSION = "2022-11-28"
@@ -25,7 +25,7 @@ def _should_retry(resp: httpx2.Response) -> bool:
 
 
 class GitHub:
-    def __init__(self, token: str, settings: Settings) -> None:
+    def __init__(self, token: str, settings: Config) -> None:
         base = httpx2.Client(
             base_url=API,
             headers={
@@ -58,8 +58,17 @@ class GitHub:
     def team_exists(self, org: str, slug: str) -> bool:
         return self.c.get(f"/orgs/{org}/teams/{slug}").status_code == 200
 
+    def get_team_invites(self, org: str, slug: str) -> bool:
+        # TODO: paginate for >100
+        r = self.c.get(
+            f"/orgs/{org}/teams/{slug}/invitations", params={"per_page": 100}
+        )
+        _check(r, (200,), f"get invites of {org}/{slug}")
+        members = [m["login"] for m in r.json()]
+        return members
+
     def get_team_members(self, org: str, slug: str) -> bool:
-        # NOTE: does not currently paginate, but realistically team sizes <= 100
+        # TODO: paginate for >100
         r = self.c.get(f"/orgs/{org}/teams/{slug}/members", params={"per_page": 100})
         _check(r, (200,), f"get members of {org}/{slug}")
         members = [m["login"] for m in r.json()]
@@ -82,6 +91,12 @@ class GitHub:
         )
         _check(r, (204,), f"remove {username} from team {slug}")
 
+    # def remove_team_invite(self, org: str, slug: str, username: str) -> None:
+    # # TODO: if needed, need to fetch invite ID first
+    #     r = self.c.delete(
+    #         f"/orgs/{org}/teams/{slug}/invitations/{username}",
+    #     )
+    #     _check(r, (204,), f"remove {username} invite from team {slug}")
 
     def generate_repo(self, t_owner: str, t_repo: str, org: str, name: str) -> None:
         r = self.c.post(

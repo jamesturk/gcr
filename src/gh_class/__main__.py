@@ -12,8 +12,16 @@ from .settings import load_config
 app = typer.Typer(add_completion=False, help="GitHub Classroom replacement CLI")
 
 
+class Theme:
+    ERROR = typer.colors.RED
+    OK = typer.colors.CYAN
+    DRY = typer.colors.MAGENTA
+    ADD = typer.colors.GREEN
+    WARN = typer.colors.YELLOW
+
+
 def _quit(msg: str) -> None:
-    typer.secho(f"error: {msg}", fg=typer.colors.RED, err=True)
+    typer.secho(f"error: {msg}", fg=Theme.ERROR, err=True)
     raise typer.Exit(1)
 
 
@@ -27,13 +35,68 @@ def _check_env(config_path: Path):
     except Exception as e:
         _quit(f"could not load: {config_path}\n{e}")
 
-    gh = GitHub(token, cfg.settings)
+    gh = GitHub(token, cfg)
 
     # validate org exists & is accessible via API
     if not gh.org_exists(cfg.org):
         _quit(f"org not accessible (check name and token scopes): {cfg.org}")
 
     return cfg, gh
+
+
+def _sync_team(gh, org, team, cfg_members, dry_run):
+    members = set()
+    invites = set()
+    current_set = set(cfg_members)
+
+    # create team if needed
+    if not gh.team_exists(org, team):
+        if dry_run:
+            typer.secho(f"would create team {org} - {team}", fg=Theme.DRY)
+        else:
+            gh.create_team(org, team)
+            typer.echo(f"created team '{team}'")
+    else:
+        members = set(gh.get_team_members(org, team))
+        invites = set(gh.get_team_invites(org, team))
+
+    # already all set!
+    if current_set == members:
+        typer.secho(
+            f"team '{team}' already initialized, {len(members)} members", fg=Theme.OK
+        )
+
+    # add people that do not have membership or a pending invite
+    to_add = current_set - (members | invites)
+    for m in to_add:
+        if dry_run:
+            typer.secho(f"would add {m} to {team}", fg=Theme.DRY)
+        else:
+            typer.secho(f"{m} invited to {team}", fg=Theme.ADD)
+            gh.add_team_member(org, team, m)
+
+    # remove anyone with permissions that doesn't appear in config
+    to_remove = members - current_set
+    for m in to_remove:
+        if dry_run:
+            typer.secho(f"would remove {m} from {team}", fg=Theme.DRY)
+        else:
+            gh.remove_team_member(org, team, m)
+            typer.secho(f"{m} removed from {team}", fg=Theme.WARN)
+
+    # show status of invites.
+    # does not remove invites of students that should be purged as
+    #  this is a rare edge case and adds a complexity w/ GH data model
+    # mistakenly added students can be removed via browser if urgent
+    to_uninvite = invites - (current_set | members)
+    for m in invites:
+        if m in to_uninvite:
+            typer.secho(
+                f"{m} has been removed but has an invite to {team} (remove or let expire)",
+                fg=Theme.ERROR,
+            )
+        else:
+            typer.secho(f"{m} has a pending invite to {team}", fg=Theme.OK)
 
 
 @app.command()
@@ -47,45 +110,9 @@ def setup(
     ] = False,
 ):
     """initialize classroom org"""
-
     cfg, gh = _check_env(config)
-
-    team = cfg.settings.staff_team
-    members = set()
-    if not gh.team_exists(cfg.org, team):
-        if dry_run:
-            typer.secho(
-                f"would create staff team {cfg.org}/{team}", fg=typer.colors.YELLOW
-            )
-        else:
-            gh.create_team(cfg.org, team)
-            typer.echo(f"created team '{team}'")
-    else:
-        members = set(gh.get_team_members(cfg.org, team))
-
-    # member diff
-    staff_set = set(cfg.staff)
-
-    if staff_set == members:
-        typer.secho(f"staff team already initialized, {len(members)} members", fg=typer.colors.GREEN)
-        return # done!
-
-    to_add = staff_set - members
-    to_remove = members - staff_set
-
-    for m in to_add:
-        if dry_run:
-            typer.secho(f"would add {m} to {team}", fg=typer.colors.YELLOW)
-        else:
-            typer.secho(f"adding {m} to {team}", fg=typer.colors.YELLOW)
-            gh.add_team_member(cfg.org, team, m)
-
-    for m in to_remove:
-        if dry_run:
-            typer.secho(f"would remove {m} from {team}", fg=typer.colors.YELLOW)
-        else:
-            typer.secho(f"removing {m} from {team}", fg=typer.colors.YELLOW)
-            gh.remove_team_member(cfg.org, team, m)
+    _sync_team(gh, cfg.org, cfg.staff_team, cfg.staff, dry_run)
+    _sync_team(gh, cfg.org, cfg.student_team, cfg.students, dry_run)
 
 
 @app.command()
@@ -133,33 +160,27 @@ def assign(
                 tag = "skip"
             else:
                 if dry_run:
-                    typer.secho(
-                        f"would create repo {cfg.org}/{repo}", fg=typer.color.YELLOW
-                    )
+                    typer.secho(f"would create repo {cfg.org}/{repo}", fg=Theme.DRY)
                     continue
                 else:
                     gh.generate_repo(t_owner, t_repo, cfg.org, repo)
                     # reconcile access on both new and existing repos
-                    gh.add_collaborator(
-                        cfg.org, repo, username, cfg.settings.student_permission
-                    )
+                    gh.add_collaborator(cfg.org, repo, username, cfg.student_permission)
                     gh.grant_team_repo(
-                        cfg.org, slug, repo, cfg.settings.staff_permission
+                        cfg.org, cfg.staff_team, repo, cfg.staff_permission
                     )
                 created += 1
                 tag = "new "
-            typer.echo(f"  [{tag}] {repo}")
+            typer.secho(
+                f"  [{tag}] {repo}", fg=Theme.ADD if tag == "new " else Theme.OK
+            )
         except GitHubError as e:
             failed += 1
-            typer.secho(f"  [FAIL] {repo}: {e}", fg=typer.colors.RED)
+            typer.secho(f"  [FAIL] {repo}: {e}", fg=Theme.ERROR)
 
     typer.secho(
         f"\ncreated {created} | skipped {skipped} | failed {failed}",
-        fg=typer.colors.GREEN if not failed else typer.colors.YELLOW,
-    )
-    typer.secho(
-        "note: students must still accept repository invites",
-        fg=typer.colors.CYAN,
+        fg=Theme.OK if not failed else Theme.ERROR,
     )
     if failed:
         raise typer.Exit(1)
