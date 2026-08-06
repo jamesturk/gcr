@@ -6,7 +6,7 @@ import os
 import typer
 import subprocess
 import shutil
-from rich.prompt import Prompt
+from rich.prompt import Prompt, Confirm
 from pathlib import Path
 from typing import Annotated
 from .client import GitHub, GitHubError
@@ -159,15 +159,13 @@ def assign(
     if tmpl.status_code != 200:
         _quit(f"template not found: {t_owner}/{t_repo}")
     if not tmpl.json().get("is_template", False):
-        _quit(
-            f"not a template repo (enable 'Template repository' in settings):"
-            f" {t_owner}/{t_repo}"
-        )
-
-    # all usernames exist
-    bad = [u for u in (*cfg.students, *cfg.staff) if not gh.user_exists(u)]
-    if bad:
-        _quit("unknown usernames: " + ", ".join(bad))
+        if (
+            Confirm.ask(f"{t_owner}/{t_repo} is not a template repository, convert?")
+            and not dry_run
+        ):
+            gh.patch_repo(t_owner, t_repo, {"is_template": True})
+        else:
+            _quit("not a template repo")
 
     planned = [(u, f"{t_repo}-{u}") for u in cfg.students]
 

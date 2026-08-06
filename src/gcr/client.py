@@ -64,6 +64,12 @@ class GitHub:
     def get_repo(self, org: str, repo: str) -> httpx2.Response:
         return self.c.get(f"/repos/{org}/{repo}")
 
+    def patch_repo(self, org: str, repo: str, payload: dict) -> None:
+        r = self.c.patch(f"/repos/{org}/{repo}", json=payload)
+        _check(r, (200,), f"patch repo settings {org}/{repo} {payload}")
+        for key, val in payload.items():
+            assert r.json()[key] == val
+
     def repo_exists(self, org: str, repo: str) -> bool:
         return self.c.get(f"/repos/{org}/{repo}").status_code == 200
 

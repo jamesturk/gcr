@@ -63,5 +63,17 @@ Initialize GitHub organization and invite staff & students.
 
 Creates one private repo per student, granting access to their account & staff.
 
-### `gcr clone <assignment> <student>`
+### `gcr clone <assignment> <optional-student>`
 
+Clone student repos to a local directory.
+
+## Changelog
+
+### 0.3.0 - 5 August 2026
+
+- Addition of `clone`
+- Prompt to automatically make assignment repository a template.
+
+### 0.2.0 - 4 August 2026
+
+- First 'public' release.

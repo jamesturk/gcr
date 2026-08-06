@@ -1,6 +1,6 @@
 [project]
 name = "gcr-cli"
-version = "0.2.0"
+version = "0.3.0"
 license = "AGPL-3.0-or-later"
 description = "Command-line utility for running a class on GitHub."
 authors = [
