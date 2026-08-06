@@ -9,6 +9,7 @@ class Config:
     org: str
     students: list[str]
     staff: list[str] = field(default_factory=list)
+    checkout_path: str = "./_checkouts/"
     staff_team: str = "staff"
     student_team: str = "students"
     student_permission: str = "push"

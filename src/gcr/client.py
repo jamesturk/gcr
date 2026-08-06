@@ -49,6 +49,18 @@ class GitHub:
     def org_exists(self, org: str) -> bool:
         return self.c.get(f"/orgs/{org}").status_code == 200
 
+    def get_repos(self, org: str, prefix: str) -> bool:
+        repos = []
+        page = 1
+        while True:
+            r = self.c.get(f"/orgs/{org}/repos", params={"per_page": 100, "page": page})
+            batch = r.json()
+            if not batch:
+                break
+            repos += [d["name"] for d in batch if d["name"].startswith(prefix)]
+            page += 1
+        return repos
+
     def get_repo(self, org: str, repo: str) -> httpx2.Response:
         return self.c.get(f"/repos/{org}/{repo}")
 

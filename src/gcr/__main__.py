@@ -4,6 +4,9 @@ gh-class: minimal GitHub classroom replacement CLI
 
 import os
 import typer
+import subprocess
+import shutil
+from rich.prompt import Prompt
 from pathlib import Path
 from typing import Annotated
 from .client import GitHub, GitHubError
@@ -201,6 +204,59 @@ def assign(
     )
     if failed:
         raise typer.Exit(1)
+
+
+@app.command()
+def clone(
+    assignment: Annotated[str, typer.Argument(help="Assignment slug.")],
+    student: Annotated[str, typer.Argument(help="Student name.")] = "all",
+    config: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to class.toml.")
+    ] = Path("class.toml"),
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Show plan, make no changes."),
+    ] = False,
+) -> None:
+    """create student repositories"""
+
+    cfg, gh = _check_env(config)
+
+    def _clone(user: str) -> None:
+        repo = f"{assignment}-{user}"
+        tmpl = gh.get_repo(cfg.org, repo)
+        if tmpl.status_code != 200:
+            _quit(f"repo not found: {cfg.org}/{repo}")
+
+        clone_url = f"git@github.com:{cfg.org}/{repo}"
+        dest = Path(cfg.checkout_path) / repo
+        if dest.exists():
+            resp = Prompt.ask(
+                f"{dest} already exists, (S)kip/(r)eplace/(a)bort?",
+                choices=["s", "r", "a"],
+                default="s",
+            )
+            if resp == "s":
+                return
+            elif resp == "r":
+                shutil.rmtree(dest)
+                typer.secho(f"removed {dest}", fg=Theme.WARN)
+            elif resp == "a":
+                raise typer.Exit(1)
+        subprocess.run(
+            ["git", "clone", clone_url, dest],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        typer.secho(f"cloned {dest}", fg=Theme.ADD)
+
+    if student == "all":
+        for repo in gh.get_repos(cfg.org, assignment + "-"):
+            sslug = repo.replace(assignment + "-", "")
+            _clone(sslug)
+    else:
+        _clone(student)
 
 
 if __name__ == "__main__":

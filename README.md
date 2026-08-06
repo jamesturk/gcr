@@ -53,16 +53,15 @@ All commands take two options:
 - `-c`/`--config`: path to `class.toml` (default: current dir)
 - `--dry-run`: avoid making actual changes on GitHub
 
-### Initialize
-
-`gcr setup`
+### `gcr setup`
 
 Initialize GitHub organization and invite staff & students.
 
 *The organization must already exist and your API key must have access.*
 
-### Create Assignment
-
-`gcr assign <template-repo-name>`
+### `gcr assign <template-repo-name>`
 
 Creates one private repo per student, granting access to their account & staff.
+
+### `gcr clone <assignment> <student>`
+
