@@ -8,7 +8,11 @@ At the moment, this is early alpha software, use at your own risk.
 
 ## Installation
 
-The recommended method for installation is `uvx gcr`.
+The recommended method for installation is `uv tool install gcr-cli`, you can then run `gcr`.
+
+uvx: `uvx --from gcr-cli gcr`
+
+pipx: `pipx install gcr-cli`, then run `gcr`
 
 ## Setup
 
