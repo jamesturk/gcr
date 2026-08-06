@@ -37,6 +37,7 @@ staff = [
   "accounts",
 ]
 
+# optional settings, typically no need to set these
 staff_team = "staff"
 student_team = "students"
 student_permission = "push"
@@ -57,11 +58,15 @@ All commands take two options:
 
 Initialize GitHub organization and invite staff & students.
 
+You can re-run this command after making changes to class.toml and the class and staff roster will be synced.
+
 *The organization must already exist and your API key must have access.*
 
 ### `gcr assign {template-repo-name}`
 
 Creates one private repo per student, granting access to their account & staff.
+
+It is safe to run this command multiple times, existing repos will be skipped.
 
 ### `gcr clone {assignment} [optional-student]`
 
@@ -69,7 +74,7 @@ Clone student repos to a local directory.
 
 ## Changelog
 
-### 0.3.0 - 5 August 2026
+### 0.3.0 - 6 August 2026
 
 - Addition of `clone`
 - Prompt to automatically make assignment repository a template.
