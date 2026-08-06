@@ -216,7 +216,7 @@ def clone(
         typer.Option("--dry-run", help="Show plan, make no changes."),
     ] = False,
 ) -> None:
-    """create student repositories"""
+    """clone student repositories"""
 
     cfg, gh = _check_env(config)
 

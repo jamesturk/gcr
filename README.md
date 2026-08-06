@@ -59,11 +59,11 @@ Initialize GitHub organization and invite staff & students.
 
 *The organization must already exist and your API key must have access.*
 
-### `gcr assign <template-repo-name>`
+### `gcr assign {template-repo-name}`
 
 Creates one private repo per student, granting access to their account & staff.
 
-### `gcr clone <assignment> <optional-student>`
+### `gcr clone {assignment} [optional-student]`
 
 Clone student repos to a local directory.
 
