@@ -58,6 +58,13 @@ class GitHub:
     def team_exists(self, org: str, slug: str) -> bool:
         return self.c.get(f"/orgs/{org}/teams/{slug}").status_code == 200
 
+    def get_team_members(self, org: str, slug: str) -> bool:
+        # NOTE: does not currently paginate, but realistically team sizes <= 100
+        r = self.c.get(f"/orgs/{org}/teams/{slug}/members", params={"per_page": 100})
+        _check(r, (200,), f"get members of {org}/{slug}")
+        members = [m["login"] for m in r.json()]
+        return members
+
     def create_team(self, org: str, name: str) -> None:
         r = self.c.post(f"/orgs/{org}/teams", json={"name": name, "privacy": "closed"})
         _check(r, (201,), f"create team {name}")
@@ -68,6 +75,13 @@ class GitHub:
             json={"role": "member"},
         )
         _check(r, (200,), f"add {username} to team {slug}")
+
+    def remove_team_member(self, org: str, slug: str, username: str) -> None:
+        r = self.c.delete(
+            f"/orgs/{org}/teams/{slug}/memberships/{username}",
+        )
+        _check(r, (204,), f"remove {username} from team {slug}")
+
 
     def generate_repo(self, t_owner: str, t_repo: str, org: str, name: str) -> None:
         r = self.c.post(

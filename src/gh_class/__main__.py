@@ -1,15 +1,5 @@
 """
 gh-class: minimal GitHub classroom replacement CLI
-
-## Setup
-
-1. Set GITHUB_TOKEN to a classic token with org & repo admin permissions.
-2. Create a class.toml with roster & settings.
-
-## Usage
-
-gh-class assign <repo-name>
-    creates private repos per student for a given template repository
 """
 
 import os
@@ -27,6 +17,77 @@ def _quit(msg: str) -> None:
     raise typer.Exit(1)
 
 
+def _check_env(config_path: Path):
+    """check that token & config are present & return them"""
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        _quit("GITHUB_TOKEN is not set.")
+    try:
+        cfg = load_config(config_path)
+    except Exception as e:
+        _quit(f"could not load: {config_path}\n{e}")
+
+    gh = GitHub(token, cfg.settings)
+
+    # validate org exists & is accessible via API
+    if not gh.org_exists(cfg.org):
+        _quit(f"org not accessible (check name and token scopes): {cfg.org}")
+
+    return cfg, gh
+
+
+@app.command()
+def setup(
+    config: Annotated[
+        Path, typer.Option("--config", "-c", help="Path to class.toml.")
+    ] = Path("class.toml"),
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Show plan, make no changes."),
+    ] = False,
+):
+    """initialize classroom org"""
+
+    cfg, gh = _check_env(config)
+
+    team = cfg.settings.staff_team
+    members = set()
+    if not gh.team_exists(cfg.org, team):
+        if dry_run:
+            typer.secho(
+                f"would create staff team {cfg.org}/{team}", fg=typer.colors.YELLOW
+            )
+        else:
+            gh.create_team(cfg.org, team)
+            typer.echo(f"created team '{team}'")
+    else:
+        members = set(gh.get_team_members(cfg.org, team))
+
+    # member diff
+    staff_set = set(cfg.staff)
+
+    if staff_set == members:
+        typer.secho(f"staff team already initialized, {len(members)} members", fg=typer.colors.GREEN)
+        return # done!
+
+    to_add = staff_set - members
+    to_remove = members - staff_set
+
+    for m in to_add:
+        if dry_run:
+            typer.secho(f"would add {m} to {team}", fg=typer.colors.YELLOW)
+        else:
+            typer.secho(f"adding {m} to {team}", fg=typer.colors.YELLOW)
+            gh.add_team_member(cfg.org, team, m)
+
+    for m in to_remove:
+        if dry_run:
+            typer.secho(f"would remove {m} from {team}", fg=typer.colors.YELLOW)
+        else:
+            typer.secho(f"removing {m} from {team}", fg=typer.colors.YELLOW)
+            gh.remove_team_member(cfg.org, team, m)
+
+
 @app.command()
 def assign(
     template: Annotated[
@@ -42,24 +103,10 @@ def assign(
 ) -> None:
     """create student repositories"""
 
-    ##### check environment ##############################
-    token = os.environ.get("GITHUB_TOKEN")
-    if not token:
-        _quit("GITHUB_TOKEN is not set.")
-    try:
-        cfg = load_config(config)
-    except Exception as e:
-        _quit(f"could not load: {config}\n{e}")
-
-    gh = GitHub(token, cfg.settings)
+    cfg, gh = _check_env(config)
 
     # accept org_name/repo_name or just repo_name (defaulting to classroom org)
     t_owner, t_repo = template.split("/", 1) if "/" in template else (cfg.org, template)
-
-    ##### validate github permissions ##############################
-    typer.secho("validating...", fg=typer.colors.CYAN)
-    if not gh.org_exists(cfg.org):
-        _quit(f"org not accessible (check name and token scopes): {cfg.org}")
 
     # template repo available
     tmpl = gh.get_repo(t_owner, t_repo)
@@ -77,23 +124,7 @@ def assign(
 
     planned = [(u, f"{t_repo}-{u}") for u in cfg.students]
 
-    ##### create staff team if needed ###############################
-    slug = cfg.settings.staff_team
-    if not gh.team_exists(cfg.org, slug):
-        if dry_run:
-            typer.secho(
-                f"would create staff team {cfg.org}/{slug}", fg=typer.colors.YELLOW
-            )
-        else:
-            gh.create_team(cfg.org, slug)
-            typer.echo(f"created team '{slug}'")
-            for s in cfg.staff:
-                # TODO: diff current team vs. TOML / dry-run
-                gh.add_team_member(cfg.org, slug, s)
-
-    typer.echo(f"staff team ready ({len(cfg.staff)} members)")
-
-    ##### create student repos as needed #############################
+    # create student repos as needed
     created = skipped = failed = 0
     for username, repo in planned:
         try:
@@ -126,9 +157,8 @@ def assign(
         f"\ncreated {created} | skipped {skipped} | failed {failed}",
         fg=typer.colors.GREEN if not failed else typer.colors.YELLOW,
     )
-
     typer.secho(
-        "note: student invites stay pending until each accepts",
+        "note: students must still accept repository invites",
         fg=typer.colors.CYAN,
     )
     if failed:
