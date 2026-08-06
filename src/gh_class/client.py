@@ -74,6 +74,12 @@ class GitHub:
         members = [m["login"] for m in r.json()]
         return members
 
+    def patch_org(self, org: str, payload: dict) -> None:
+        r = self.c.patch(f"/orgs/{org}", json=payload)
+        _check(r, (200,), f"patch org settings {org} {payload}")
+        for key, val in payload.items():
+            assert r.json()[key] == val
+
     def create_team(self, org: str, name: str) -> None:
         r = self.c.post(f"/orgs/{org}/teams", json={"name": name, "privacy": "closed"})
         _check(r, (201,), f"create team {name}")

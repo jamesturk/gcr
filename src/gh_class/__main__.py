@@ -111,6 +111,15 @@ def setup(
 ):
     """initialize classroom org"""
     cfg, gh = _check_env(config)
+    if not dry_run:
+        typer.secho("locking down default org settings\n  (hidden repos by default/no student creation)", fg=Theme.OK)
+        gh.patch_org(
+            cfg.org,
+            {
+                "default_repository_permission": "none",
+                "members_can_create_repositories": False,
+            },
+        )
     _sync_team(gh, cfg.org, cfg.staff_team, cfg.staff, dry_run)
     _sync_team(gh, cfg.org, cfg.student_team, cfg.students, dry_run)
 

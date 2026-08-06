@@ -24,6 +24,7 @@ staff = [
 ]
 
 staff_team = "staff"
+student_team = "students"
 student_permission = "push"
 staff_permission = "maintain"
 requests_per_minute = 60
