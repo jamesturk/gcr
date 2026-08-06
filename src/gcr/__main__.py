@@ -6,6 +6,9 @@ import os
 import typer
 import subprocess
 import shutil
+import enum
+from rich.table import Table
+from rich.console import Console
 from rich.prompt import Prompt, Confirm
 from pathlib import Path
 from typing import Annotated
@@ -13,6 +16,21 @@ from .client import GitHub, GitHubError
 from .settings import load_config, Config
 
 app = typer.Typer(add_completion=False, help="GitHub Classroom replacement CLI")
+
+
+class Action(enum.Enum):
+    NONE = "—"
+    ADD = "add"
+    REMOVE = "remove"
+    ORPHAN = "remove invite (manual)"  # can't auto-delete without invite ID
+
+
+_STYLE = {
+    Action.ADD: "green",
+    Action.REMOVE: "red",
+    Action.ORPHAN: "yellow",
+    Action.NONE: "dim",
+}
 
 
 class Theme:
@@ -47,62 +65,63 @@ def _check_env(config_path: Path) -> tuple[Config, GitHub]:
     return cfg, gh
 
 
+def _plan_team(
+    gh: GitHub, org: str, team: str, cfg_members: list[str]
+) -> list[tuple[str, str, Action]]:
+    desired = set(cfg_members)
+    members = set()
+    invites = set()
+    if gh.team_exists(org, team):
+        members = set(gh.get_team_members(org, team))
+        invites = set(gh.get_team_invites(org, team))
+    plan = []
+    for u in sorted(desired | members | invites):
+        in_cfg = u in desired
+        if u in members:
+            action = Action.NONE if in_cfg else Action.REMOVE
+            status = "member"
+        elif u in invites:
+            action = Action.NONE if in_cfg else Action.ORPHAN
+            status = "invited"
+        else:  # in roster only
+            action, status = Action.ADD, "-"
+        plan.append((u, status, action))
+
+    return plan
+
+
 def _sync_team(
     gh: GitHub, org: str, team: str, cfg_members: list[str], dry_run: bool
 ) -> None:
-    members = set()
-    invites = set()
-    current_set = set(cfg_members)
+    plan = _plan_team(gh, org, team, cfg_members)
 
-    # create team if needed
-    if not gh.team_exists(org, team):
-        if dry_run:
-            typer.secho(f"would create team {org} - {team}", fg=Theme.DRY)
-        else:
-            gh.create_team(org, team)
-            typer.echo(f"created team '{team}'")
-    else:
-        members = set(gh.get_team_members(org, team))
-        invites = set(gh.get_team_invites(org, team))
+    table = Table(title=team, header_style="bold")
+    for col in ("username", "current status", "action"):
+        table.add_column(col)
+    for user, status, action in plan:
+        table.add_row(user, status, action.value, style=_STYLE[action])
+    Console().print(table)
 
-    # already all set!
-    if current_set == members:
-        typer.secho(
-            f"team '{team}' already initialized, {len(members)} members", fg=Theme.OK
-        )
+    changes = sum(1 for _, _, a in plan if a in (Action.ADD, Action.REMOVE))
 
-    # add people that do not have membership or a pending invite
-    to_add = current_set - (members | invites)
-    for m in to_add:
-        if dry_run:
-            typer.secho(f"would add {m} to {team}", fg=Theme.DRY)
-        else:
-            typer.secho(f"{m} invited to {team}", fg=Theme.ADD)
-            gh.add_team_member(org, team, m)
+    if (
+        dry_run
+        or changes == 0
+        or not Confirm.ask(f"proceed to make {changes} changes?")
+    ):
+        return
+    for user, _, action in plan:
+        if action is Action.ADD:
+            try:
+                gh.add_team_member(org, team, user)
+            except GitHubError as e:
+                typer.secho(f"error adding {user}: {e}", fg=Theme.ERROR)
+        elif action is Action.REMOVE:
+            gh.remove_team_member(org, team, user)
 
-    # remove anyone with permissions that doesn't appear in config
-    to_remove = members - current_set
-    for m in to_remove:
-        if dry_run:
-            typer.secho(f"would remove {m} from {team}", fg=Theme.DRY)
-        else:
-            gh.remove_team_member(org, team, m)
-            typer.secho(f"{m} removed from {team}", fg=Theme.WARN)
-
-    # show status of invites.
-    # does not remove invites of students that should be purged as
+    # ORPHAN is currently unresolved
     #  this is a rare edge case and adds a complexity w/ GH data model
-    # mistakenly added students can be removed via browser if urgent
-    to_uninvite = invites - (current_set | members)
-    for m in invites:
-        if m in to_uninvite:
-            typer.secho(
-                f"{m} has been removed but has an invite to {team} "
-                "(remove or let expire)",
-                fg=Theme.ERROR,
-            )
-        else:
-            typer.secho(f"{m} has a pending invite to {team}", fg=Theme.OK)
+    #  mistakenly invited students can be removed via browser if urgent
 
 
 @app.command()
@@ -211,10 +230,6 @@ def clone(
     config: Annotated[
         Path, typer.Option("--config", "-c", help="Path to class.toml.")
     ] = Path("class.toml"),
-    dry_run: Annotated[
-        bool,
-        typer.Option("--dry-run", help="Show plan, make no changes."),
-    ] = False,
 ) -> None:
     """clone student repositories"""
 
