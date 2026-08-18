@@ -110,6 +110,11 @@ def _sync_team(
         or not Confirm.ask(f"proceed to make {changes} changes?")
     ):
         return
+
+    # not a dry run, can make changes now
+    if not gh.team_exists(org, team):
+        gh.create_team(org, team)
+
     for user, _, action in plan:
         if action is Action.ADD:
             try:

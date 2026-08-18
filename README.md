@@ -74,6 +74,10 @@ Clone student repos to a local directory.
 
 ## Changelog
 
+### 0.3.1
+
+- Improve output of `gcr setup`
+
 ### 0.3.0 - 6 August 2026
 
 - Addition of `clone`
