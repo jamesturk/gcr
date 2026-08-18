@@ -12,10 +12,26 @@ from rich.console import Console
 from rich.prompt import Prompt, Confirm
 from pathlib import Path
 from typing import Annotated
+from importlib.metadata import version as get_version
 from .client import GitHub, GitHubError
 from .settings import load_config, Config
 
 app = typer.Typer(add_completion=False, help="GitHub Classroom replacement CLI")
+
+
+def version_callback(value: bool) -> None:
+    if value:
+        v = get_version("gcr-cli")
+        print(f"gcr {v}")
+        raise typer.Exit()
+
+
+@app.callback()
+def common(
+    ctx: typer.Context,
+    version: bool = typer.Option(None, "--version", callback=version_callback),
+) -> None:
+    pass
 
 
 class Action(enum.Enum):

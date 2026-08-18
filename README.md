@@ -72,11 +72,16 @@ It is safe to run this command multiple times, existing repos will be skipped.
 
 Clone student repos to a local directory.
 
+### `gcr --version`
+
+Print version and exit.
+
 ## Changelog
 
 ### 0.3.1
 
 - Improve output of `gcr setup`
+- Add `gcr --version`
 
 ### 0.3.0 - 6 August 2026
 
