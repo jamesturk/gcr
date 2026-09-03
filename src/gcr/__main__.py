@@ -179,6 +179,12 @@ def assign(
     template: Annotated[
         str, typer.Argument(help="Template repo: 'name' (in org) or 'owner/name'.")
     ],
+    empty: Annotated[
+        bool,
+        typer.Option(
+            "--empty", help="Don't use template, generate empty repo w/ name."
+        ),
+    ] = False,
     config: Annotated[
         Path, typer.Option("--config", "-c", help="Path to class.toml.")
     ] = Path("class.toml"),
@@ -194,18 +200,21 @@ def assign(
     # accept org_name/repo_name or just repo_name (defaulting to classroom org)
     t_owner, t_repo = template.split("/", 1) if "/" in template else (cfg.org, template)
 
-    # template repo available
-    tmpl = gh.get_repo(t_owner, t_repo)
-    if tmpl.status_code != 200:
-        _quit(f"template not found: {t_owner}/{t_repo}")
-    if not tmpl.json().get("is_template", False):
-        if (
-            Confirm.ask(f"{t_owner}/{t_repo} is not a template repository, convert?")
-            and not dry_run
-        ):
-            gh.patch_repo(t_owner, t_repo, {"is_template": True})
-        else:
-            _quit("not a template repo")
+    if not empty:
+        # template repo available
+        tmpl = gh.get_repo(t_owner, t_repo)
+        if tmpl.status_code != 200:
+            _quit(f"template not found: {t_owner}/{t_repo}")
+        if not tmpl.json().get("is_template", False):
+            if (
+                Confirm.ask(
+                    f"{t_owner}/{t_repo} is not a template repository, convert?"
+                )
+                and not dry_run
+            ):
+                gh.patch_repo(t_owner, t_repo, {"is_template": True})
+            else:
+                _quit("not a template repo")
 
     planned = [(u, f"{t_repo}-{u}") for u in cfg.students]
 
@@ -221,7 +230,10 @@ def assign(
                     typer.secho(f"would create repo {cfg.org}/{repo}", fg=Theme.DRY)
                     continue
                 else:
-                    gh.generate_repo(t_owner, t_repo, cfg.org, repo)
+                    if empty:
+                        gh.generate_empty_repo(cfg.org, repo)
+                    else:
+                        gh.generate_repo(t_owner, t_repo, cfg.org, repo)
                     # reconcile access on both new and existing repos
                     gh.add_collaborator(cfg.org, repo, username, cfg.student_permission)
                     gh.grant_team_repo(

@@ -78,6 +78,10 @@ Print version and exit.
 
 ## Changelog
 
+### 0.3.2 - 3 September 2026
+
+- Add `gcr assign name --empty` to create empty repos with correct perms.
+
 ### 0.3.1
 
 - Improve output of `gcr setup`

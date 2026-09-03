@@ -129,6 +129,13 @@ class GitHub:
         )
         _check(r, (201,), f"create repo {name}")
 
+    def generate_empty_repo(self, org: str, name: str) -> None:
+        r = self.c.post(
+            f"/orgs/{org}/repos",
+            json={"name": name, "private": True, "auto_init": False},
+        )
+        _check(r, (201,), f"create repo {name}")
+
     def add_collaborator(self, org: str, repo: str, username: str, perm: str) -> None:
         r = self.c.put(
             f"/repos/{org}/{repo}/collaborators/{username}",
