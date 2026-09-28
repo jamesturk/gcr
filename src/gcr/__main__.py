@@ -185,6 +185,7 @@ def assign(
             "--empty", help="Don't use template, generate empty repo w/ name."
         ),
     ] = False,
+    user: Annotated[str, typer.Option(help="Only assign to provided username.")] = "",
     config: Annotated[
         Path, typer.Option("--config", "-c", help="Path to class.toml.")
     ] = Path("class.toml"),
@@ -216,7 +217,14 @@ def assign(
             else:
                 _quit("not a template repo")
 
-    planned = [(u, f"{t_repo}-{u}") for u in cfg.students]
+    if user:
+        if user not in cfg.students:
+            typer.secho(
+                "running assign for user not currently listed in config", fg=Theme.WARN
+            )
+        planned = [(user, f"{t_repo}-{user}")]
+    else:
+        planned = [(u, f"{t_repo}-{u}") for u in cfg.students]
 
     # create student repos as needed
     created = skipped = failed = 0

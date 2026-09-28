@@ -62,11 +62,13 @@ You can re-run this command after making changes to class.toml and the class and
 
 *The organization must already exist and your API key must have access.*
 
-### `gcr assign {template-repo-name}`
+### `gcr assign {template-repo-name} [--user USERNAME]`
 
 Creates one private repo per student, granting access to their account & staff.
 
 It is safe to run this command multiple times, existing repos will be skipped.
+
+Can pass a username to assign to a single user, useful as a faster option when adding a student after a class begins.
 
 ### `gcr clone {assignment} [optional-student]`
 
@@ -77,6 +79,10 @@ Clone student repos to a local directory.
 Print version and exit.
 
 ## Changelog
+
+### 0.3.3 - 27 September 2026
+
+- Add `gcr assign --user` to assign to a single user after creation.
 
 ### 0.3.2 - 3 September 2026
 
