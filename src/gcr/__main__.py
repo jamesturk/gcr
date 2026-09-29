@@ -3,10 +3,11 @@ gh-class: minimal GitHub classroom replacement CLI
 """
 
 import os
-import typer
+import tempfile
 import subprocess
 import shutil
 import enum
+import typer
 from rich.table import Table
 from rich.console import Console
 from rich.prompt import Prompt, Confirm
@@ -145,6 +146,24 @@ def _sync_team(
     #  mistakenly invited students can be removed via browser if urgent
 
 
+def _prepare_dir(src: Path, work: Path) -> None:
+    """copy src into work and make a single initial commit"""
+    shutil.copytree(src, work, ignore=shutil.ignore_patterns(".git"))
+    for cmd in (
+        ["git", "init", "-b", "main"],
+        ["git", "add", "-A"],
+        ["git", "commit", "-m", "Initial commit"],
+    ):
+        subprocess.run(cmd, cwd=work, check=True, capture_output=True)
+
+
+def _push_dir(work: Path, org: str, repo: str) -> None:
+    url = f"git@github.com:{org}/{repo}.git"
+    subprocess.run(
+        ["git", "push", url, "main"], cwd=work, check=True, capture_output=True
+    )
+
+
 @app.command()
 def setup(
     config: Annotated[
@@ -185,6 +204,9 @@ def assign(
             "--empty", help="Don't use template, generate empty repo w/ name."
         ),
     ] = False,
+    local: Annotated[
+        Path | None, typer.Option(help="Assign from a local directory.")
+    ] = None,
     user: Annotated[str, typer.Option(help="Only assign to provided username.")] = "",
     config: Annotated[
         Path, typer.Option("--config", "-c", help="Path to class.toml.")
@@ -201,7 +223,8 @@ def assign(
     # accept org_name/repo_name or just repo_name (defaulting to classroom org)
     t_owner, t_repo = template.split("/", 1) if "/" in template else (cfg.org, template)
 
-    if not empty:
+    # TODO: move --template to own option too now that local and empty exist
+    if not empty and not local:
         # template repo available
         tmpl = gh.get_repo(t_owner, t_repo)
         if tmpl.status_code != 200:
@@ -226,6 +249,11 @@ def assign(
     else:
         planned = [(u, f"{t_repo}-{u}") for u in cfg.students]
 
+    if local:
+        tmp = tempfile.TemporaryDirectory()
+        work = Path(tmp.name) / t_repo
+        _prepare_dir(local, work)
+
     # create student repos as needed
     created = skipped = failed = 0
     for username, repo in planned:
@@ -238,7 +266,10 @@ def assign(
                     typer.secho(f"would create repo {cfg.org}/{repo}", fg=Theme.DRY)
                     continue
                 else:
-                    if empty:
+                    if local:
+                        gh.generate_empty_repo(cfg.org, repo)
+                        _push_dir(work, cfg.org, repo)
+                    elif empty:
                         gh.generate_empty_repo(cfg.org, repo)
                     else:
                         gh.generate_repo(t_owner, t_repo, cfg.org, repo)
@@ -252,7 +283,7 @@ def assign(
             typer.secho(
                 f"  [{tag}] {repo}", fg=Theme.ADD if tag == "new " else Theme.OK
             )
-        except GitHubError as e:
+        except (GitHubError, subprocess.CalledProcessError) as e:
             failed += 1
             typer.secho(f"  [FAIL] {repo}: {e}", fg=Theme.ERROR)
 
